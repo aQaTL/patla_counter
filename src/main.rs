@@ -157,7 +157,7 @@ async fn main() -> std::io::Result<()> {
 					),
 			)
 	})
-	.bind("localhost:8080")?
+	.bind(std::env::var("PORT").unwrap())?
 	.run()
 	.await
 }
