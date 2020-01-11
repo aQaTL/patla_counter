@@ -128,6 +128,7 @@ async fn main() -> std::io::Result<()> {
 		std::env::var("ADDRESS").unwrap_or(String::from("localhost")),
 		std::env::var("PORT").unwrap()
 	);
+	println!("BIND ADDRESS: {}", bind_addr);
 	HttpServer::new(move || {
 		App::new()
 			.data(pool.clone())
