@@ -157,7 +157,11 @@ async fn main() -> std::io::Result<()> {
 					),
 			)
 	})
-	.bind(std::env::var("PORT").unwrap())?
+	.bind(format!(
+		"{}:{}",
+		std::env::var("ADDRESS").unwrap_or_default(),
+		std::env::var("PORT").unwrap()
+	))?
 	.run()
 	.await
 }
