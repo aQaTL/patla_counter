@@ -125,7 +125,7 @@ async fn main() -> std::io::Result<()> {
 
 	let bind_addr = format!(
 		"{}:{}",
-		std::env::var("ADDRESS").unwrap_or_default(),
+		std::env::var("ADDRESS").unwrap_or(String::from("0:0:0:0")),
 		std::env::var("PORT").unwrap()
 	);
 	HttpServer::new(move || {
