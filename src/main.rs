@@ -125,7 +125,7 @@ async fn main() -> std::io::Result<()> {
 
 	let bind_addr = format!(
 		"{}:{}",
-		std::env::var("ADDRESS").unwrap_or(String::from("localhost")),
+		std::env::var("ADDRESS").unwrap_or(String::from("0.0.0.0")),
 		std::env::var("PORT").unwrap()
 	);
 	println!("BIND ADDRESS: {}", bind_addr);
