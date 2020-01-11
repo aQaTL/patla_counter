@@ -1,3 +1,4 @@
+use actix_files::NamedFile;
 use actix_identity::Identity;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::*;
@@ -28,7 +29,7 @@ async fn fetch_all_rows(
 		use self::schema::entries::dsl::*;
 
 		let conn = pool.get().unwrap();
-		entries.load::<Entry>(&conn)
+		entries.order(id.desc()).load::<Entry>(&conn)
 	})
 	.await
 	.map_err(|_| HttpResponse::InternalServerError())?; // convert diesel error to http response
@@ -42,7 +43,7 @@ struct AddForm {
 }
 
 async fn add(
-	form: web::Form<AddForm>,
+	form: web::Json<AddForm>,
 	pool: web::Data<Pool>,
 	id: Identity,
 ) -> Result<impl Responder, Error> {
@@ -54,16 +55,20 @@ async fn add(
 		created: now(),
 	};
 
-	web::block(move || {
+	let new_entry = web::block(move || {
 		use self::schema::entries::dsl::*;
 		let conn = pool.get().unwrap();
 		diesel::insert_into(entries)
 			.values(&new_entry)
-			.execute(&conn)
+			.get_result::<Entry>(&conn)
 	})
 	.await
 	.map_err(|_| HttpResponse::InternalServerError())?; // convert diesel error to http response
-	Ok(HttpResponse::SeeOther().header("Location", "/all").body(""))
+
+	Ok(HttpResponse::Created().body(
+		serde_json::to_string(&new_entry)
+			.map_err(|_| HttpResponse::InternalServerError().body(""))?,
+	))
 }
 
 #[derive(Deserialize)]
@@ -72,7 +77,7 @@ struct AuthForm {
 }
 
 async fn auth(
-	form: web::Form<AuthForm>,
+	form: web::Json<AuthForm>,
 	pool: web::Data<Pool>,
 	id: Identity,
 ) -> Result<impl Responder, Error> {
@@ -97,6 +102,11 @@ async fn auth(
 	Ok(HttpResponse::Ok().body("Ok"))
 }
 
+async fn index() -> Result<impl Responder, Error> {
+	Ok(NamedFile::open("frontend/dist/index.html")
+		.map_err(|_| HttpResponse::InternalServerError())?)
+}
+
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
 	dotenv::dotenv().ok();
@@ -116,15 +126,36 @@ async fn main() -> std::io::Result<()> {
 	HttpServer::new(move || {
 		App::new()
 			.data(pool.clone())
+			.wrap(
+				actix_cors::Cors::new()
+					.allowed_origin("http://localhost:8080")
+					.allowed_origin("http://localhost:8081")
+					.allowed_header("Access-Control-Allow-Credentials")
+					.finish(),
+			)
 			.wrap(IdentityService::new(
 				CookieIdentityPolicy::new(&private_key)
 					.secure(false)
 					.name("identity_cookie"),
 			))
-			.route("/all", web::get().to(fetch_all_rows))
-			.route("/add", web::post().to(add))
-			.route("/auth", web::post().to(auth))
-			.service(actix_files::Files::new("/", "frontend").index_file("index.html"))
+			.service(
+				Scope::new("/api")
+					.route("/all", web::get().to(fetch_all_rows))
+					.route("/add", web::post().to(add))
+					.route("/auth", web::post().to(auth)),
+			)
+			.service(actix_files::Files::new("/", "frontend/dist").index_file("index.html"))
+			.default_service(
+				// default to index file
+				web::resource("")
+					.route(web::get().to(index))
+					// all requests that are not `GET`
+					.route(
+						web::route()
+							.guard(guard::Not(guard::Get()))
+							.to(HttpResponse::MethodNotAllowed),
+					),
+			)
 	})
 	.bind("localhost:8080")?
 	.run()
