@@ -123,6 +123,11 @@ async fn main() -> std::io::Result<()> {
 		.map(|_| gen.gen::<u8>())
 		.collect::<Vec<u8>>();
 
+	let bind_addr = format!(
+		"{}:{}",
+		std::env::var("ADDRESS").unwrap_or_default(),
+		std::env::var("PORT").unwrap()
+	);
 	HttpServer::new(move || {
 		App::new()
 			.data(pool.clone())
@@ -157,11 +162,8 @@ async fn main() -> std::io::Result<()> {
 					),
 			)
 	})
-	.bind(format!(
-		"{}:{}",
-		std::env::var("ADDRESS").unwrap_or_default(),
-		std::env::var("PORT").unwrap()
-	))?
+	.bind(bind_addr.clone())
+	.expect(&format!("failed to bind to {}", bind_addr))
 	.run()
 	.await
 }
