@@ -132,13 +132,13 @@ async fn main() -> std::io::Result<()> {
 	HttpServer::new(move || {
 		App::new()
 			.data(pool.clone())
-			.wrap(
-				actix_cors::Cors::new()
-					.allowed_origin("http://localhost:8080")
-					.allowed_origin("http://localhost:8081")
-					.allowed_header("Access-Control-Allow-Credentials")
-					.finish(),
-			)
+			// .wrap(
+			// 	actix_cors::Cors::new()
+			// 		.allowed_origin("http://localhost:8080")
+			// 		.allowed_origin("http://localhost:8081")
+			// 		.allowed_header("Access-Control-Allow-Credentials")
+			// 		.finish(),
+			// )
 			.wrap(IdentityService::new(
 				CookieIdentityPolicy::new(&private_key)
 					.secure(false)
