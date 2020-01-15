@@ -1,3 +1,5 @@
 - [ ] change cursor to pointer on +1 and lighten the background on hover
 - [ ] fix cors so that it works with frontend running via npm webserver
 - [ ] entry editing and deleting
+- [ ] error logging
+- [ ] authentication middleware

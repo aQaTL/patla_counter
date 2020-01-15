@@ -1,8 +1,16 @@
 table! {
+	counters (id) {
+		id -> Int4,
+		name -> Nullable<Text>,
+	}
+}
+
+table! {
 	entries (id) {
 		id -> Int4,
 		reason -> Nullable<Text>,
 		created -> Timestamp,
+		counter_id -> Int4,
 	}
 }
 
@@ -13,4 +21,6 @@ table! {
 	}
 }
 
-allow_tables_to_appear_in_same_query!(entries, passwords,);
+joinable!(entries -> counters (counter_id));
+
+allow_tables_to_appear_in_same_query!(counters, entries, passwords,);

@@ -4,20 +4,59 @@ use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::*;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
-use models::Entry;
+use diesel::Insertable;
+use models::{Counter, Entry};
 use rand::Rng;
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use std::io::{Read, Write};
+use structopt::StructOpt;
 
 #[macro_use]
 extern crate diesel;
 
+mod forms;
 mod models;
 mod schema;
 
 type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
-async fn fetch_all_rows(
+async fn get_counter(
+	req: HttpRequest,
+	pool: web::Data<Pool>,
+	id: Identity,
+) -> Result<impl Responder, Error> {
+	if let None = id.identity() {
+		return Ok(HttpResponse::Forbidden().body("Access denied"));
+	}
+
+	let id = req
+		.match_info()
+		.get("id")
+		.unwrap_or("1")
+		.parse::<i32>()
+		.map_err(|_| HttpResponse::InternalServerError())?;
+
+	let counter = web::block(move || {
+		use self::schema::entries::dsl::*;
+
+		let conn = pool.get().unwrap();
+
+		let counter = {
+			use self::schema::counters::dsl::*;
+			counters.find(id).first::<Counter>(&conn)?
+		};
+		let counter_entries = Entry::belonging_to(&counter)
+			.order(id.desc())
+			.load::<Entry>(&conn);
+		counter_entries
+	})
+	.await
+	.map_err(|_| HttpResponse::InternalServerError())?; // convert diesel error to http response
+
+	Ok(HttpResponse::Ok().json(counter))
+}
+
+async fn get_counters(
 	_req: HttpRequest,
 	pool: web::Data<Pool>,
 	id: Identity,
@@ -25,25 +64,21 @@ async fn fetch_all_rows(
 	if let None = id.identity() {
 		return Ok(HttpResponse::Forbidden().body("Access denied"));
 	}
-	let all_entries = web::block(move || {
-		use self::schema::entries::dsl::*;
 
-		let conn = pool.get().unwrap();
-		entries.order(id.desc()).load::<Entry>(&conn)
+	let counters = web::block(move || {
+		use self::schema::counters::dsl::*;
+		counters
+			.order(id.desc())
+			.load::<Counter>(&pool.get().unwrap())
 	})
 	.await
-	.map_err(|_| HttpResponse::InternalServerError())?; // convert diesel error to http response
+	.map_err(|_| HttpResponse::InternalServerError())?;
 
-	Ok(HttpResponse::Ok().json(all_entries))
-}
-
-#[derive(Deserialize)]
-struct AddForm {
-	reason: Option<String>,
+	Ok(HttpResponse::Ok().json(counters))
 }
 
 async fn add(
-	form: web::Json<AddForm>,
+	form: web::Json<forms::AddForm>,
 	pool: web::Data<Pool>,
 	id: Identity,
 ) -> Result<impl Responder, Error> {
@@ -71,13 +106,24 @@ async fn add(
 	))
 }
 
-#[derive(Deserialize)]
-struct AuthForm {
-	password: String,
+async fn edit(
+	form: web::Json<forms::EditForm>,
+	pool: web::Data<Pool>,
+	id: Identity,
+) -> Result<impl Responder, Error> {
+	Ok("")
+}
+
+async fn delete(
+	form: web::Json<forms::DeleteForm>,
+	pool: web::Data<Pool>,
+	id: Identity,
+) -> Result<impl Responder, Error> {
+	Ok("")
 }
 
 async fn auth(
-	form: web::Json<AuthForm>,
+	form: web::Json<forms::AuthForm>,
 	pool: web::Data<Pool>,
 	id: Identity,
 ) -> Result<impl Responder, Error> {
@@ -107,8 +153,21 @@ async fn index() -> Result<impl Responder, Error> {
 		.map_err(|_| HttpResponse::InternalServerError())?)
 }
 
+#[derive(StructOpt)]
+struct Opt {
+	#[structopt(subcommand)]
+	cmd: Option<Cmd>,
+}
+
+#[derive(StructOpt)]
+enum Cmd {
+	AddPassword { new_password: String },
+}
+
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
+	let opt: Opt = StructOpt::from_args();
+
 	dotenv::dotenv().ok();
 
 	let connspec = std::env::var("DATABASE_URL").expect("DATABASE_URL");
@@ -116,6 +175,46 @@ async fn main() -> std::io::Result<()> {
 	let pool = r2d2::Pool::builder()
 		.build(manager)
 		.expect("Failed to create pool.");
+
+	if let Some(cmd) = opt.cmd {
+		match cmd {
+			Cmd::AddPassword { new_password } => {
+				print!("accepted {}, continue? [y/N] ", new_password);
+				std::io::stdout().flush()?;
+				match {
+					let mut b = 0u8;
+					std::io::stdin()
+						.read(unsafe { std::slice::from_raw_parts_mut(&mut b as *mut u8, 1) })?;
+					b
+				} {
+					b'y' => (),
+					_ => return Ok(()),
+				}
+				let res = web::block(move || {
+					let mut hasher = Sha256::new();
+					hasher.input(&new_password);
+					let hash = hex::encode(&hasher.result()[..]);
+
+					{
+						use self::schema::passwords::dsl::*;
+						let conn = pool.get().unwrap();
+						diesel::insert_into(passwords)
+							.values(&models::NewPassword {
+								password_hash: hash,
+							})
+							.execute(&conn)
+					}
+				})
+				.await;
+
+				match res {
+					Ok(_) => println!("Operation successful"),
+					Err(e) => eprintln!("Error: {}", e),
+				}
+			}
+		}
+		return Ok(());
+	}
 
 	let mut gen = rand::thread_rng();
 	let private_key = (0..64)
@@ -146,7 +245,8 @@ async fn main() -> std::io::Result<()> {
 			))
 			.service(
 				Scope::new("/api")
-					.route("/all", web::get().to(fetch_all_rows))
+					.route("/counter/{id}", web::get().to(get_counter))
+					.route("/counters", web::get().to(get_counters))
 					.route("/add", web::post().to(add))
 					.route("/auth", web::post().to(auth)),
 			)
