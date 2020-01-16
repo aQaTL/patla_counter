@@ -1,6 +1,7 @@
 use actix_files::NamedFile;
 use actix_identity::Identity;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
+use actix_web::error::BlockingError;
 use actix_web::*;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
@@ -29,7 +30,7 @@ async fn get_counter(
 		return Ok(HttpResponse::Forbidden().body("Access denied"));
 	}
 
-	let id = req
+	let requested_id = req
 		.match_info()
 		.get("id")
 		.unwrap_or("1")
@@ -41,19 +42,27 @@ async fn get_counter(
 
 		let conn = pool.get().unwrap();
 
-		let counter = {
+		let counter = match {
 			use self::schema::counters::dsl::*;
-			counters.find(id).first::<Counter>(&conn)?
+			counters.find(requested_id).first::<Counter>(&conn)
+		} {
+			Ok(counter) => counter,
+			Err(e) => return Err(e),
 		};
 		let counter_entries = Entry::belonging_to(&counter)
 			.order(id.desc())
 			.load::<Entry>(&conn);
 		counter_entries
 	})
-	.await
-	.map_err(|_| HttpResponse::InternalServerError())?; // convert diesel error to http response
+	.await;
 
-	Ok(HttpResponse::Ok().json(counter))
+	match counter {
+		Ok(counter) => Ok(HttpResponse::Ok().json(counter)),
+		Err(BlockingError::Error(diesel::result::Error::NotFound)) => {
+			Ok(HttpResponse::NotFound().body(""))
+		}
+		Err(_) => Ok(HttpResponse::InternalServerError().body("")),
+	}
 }
 
 async fn get_counters(
@@ -88,6 +97,7 @@ async fn add(
 	let new_entry = models::InsertEntry {
 		reason: form.reason.clone(),
 		created: now(),
+		counter_id: form.counter_id,
 	};
 
 	let new_entry = web::block(move || {

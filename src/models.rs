@@ -24,6 +24,7 @@ pub struct Counter {
 pub struct InsertEntry {
 	pub reason: Option<String>,
 	pub created: chrono::NaiveDateTime,
+	pub counter_id: i32,
 }
 
 #[derive(Serialize, Queryable)]

@@ -2,7 +2,7 @@
   <div id="auth">
     <form v-on:submit.prevent="submit()" class="auth-form">
       <label for="password">Hasło</label>
-      <input type="password" v-model="password" />
+      <input type="password" id="password" v-model="password" />
       <input type="submit" value="Zaloguj" />
     </form>
   </div>
@@ -27,7 +27,7 @@ export default {
         body: JSON.stringify({ password: this.password })
       });
       let body = await resp.text();
-      if (resp.status == 200 && body == "Ok") {
+      if (resp.status === 200 && body === "Ok") {
         this.$emit("authenticated");
       }
     }

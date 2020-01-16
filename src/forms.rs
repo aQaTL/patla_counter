@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct AddForm {
+	pub counter_id: i32,
 	pub reason: Option<String>,
 }
 
