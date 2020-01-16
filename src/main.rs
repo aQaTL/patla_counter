@@ -15,11 +15,13 @@ use structopt::StructOpt;
 #[macro_use]
 extern crate diesel;
 
+mod cli;
+mod db;
 mod forms;
 mod models;
 mod schema;
 
-type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
+pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 async fn get_counter(
 	req: HttpRequest,
@@ -163,67 +165,14 @@ async fn index() -> Result<impl Responder, Error> {
 		.map_err(|_| HttpResponse::InternalServerError())?)
 }
 
-#[derive(StructOpt)]
-struct Opt {
-	#[structopt(subcommand)]
-	cmd: Option<Cmd>,
-}
-
-#[derive(StructOpt)]
-enum Cmd {
-	AddPassword { new_password: String },
-}
-
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-	let opt: Opt = StructOpt::from_args();
+	let opt: cli::Opt = StructOpt::from_args();
 
 	dotenv::dotenv().ok();
 
-	let connspec = std::env::var("DATABASE_URL").expect("DATABASE_URL");
-	let manager = ConnectionManager::<PgConnection>::new(connspec);
-	let pool = r2d2::Pool::builder()
-		.build(manager)
-		.expect("Failed to create pool.");
-
 	if let Some(cmd) = opt.cmd {
-		match cmd {
-			Cmd::AddPassword { new_password } => {
-				print!("accepted {}, continue? [y/N] ", new_password);
-				std::io::stdout().flush()?;
-				match {
-					let mut b = 0u8;
-					std::io::stdin()
-						.read(unsafe { std::slice::from_raw_parts_mut(&mut b as *mut u8, 1) })?;
-					b
-				} {
-					b'y' => (),
-					_ => return Ok(()),
-				}
-				let res = web::block(move || {
-					let mut hasher = Sha256::new();
-					hasher.input(&new_password);
-					let hash = hex::encode(&hasher.result()[..]);
-
-					{
-						use self::schema::passwords::dsl::*;
-						let conn = pool.get().unwrap();
-						diesel::insert_into(passwords)
-							.values(&models::NewPassword {
-								password_hash: hash,
-							})
-							.execute(&conn)
-					}
-				})
-				.await;
-
-				match res {
-					Ok(_) => println!("Operation successful"),
-					Err(e) => eprintln!("Error: {}", e),
-				}
-			}
-		}
-		return Ok(());
+		return cli::run(cmd).await;
 	}
 
 	let mut gen = rand::thread_rng();
@@ -231,6 +180,8 @@ async fn main() -> std::io::Result<()> {
 		.into_iter()
 		.map(|_| gen.gen::<u8>())
 		.collect::<Vec<u8>>();
+
+	let pool = db::connect().await;
 
 	let bind_addr = format!(
 		"{}:{}",
