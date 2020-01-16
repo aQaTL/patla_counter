@@ -1,23 +1,49 @@
 <template>
 	<div id="app">
-		<router-view v-on:authenticated="$router.push('/counter/1')">
+		<side-bar v-if="showSideBar" v-bind:counters="counters"/>
+		<router-view v-on:authenticated="auth()">
 		</router-view>
 	</div>
 </template>
 
 <script>
+	import SideBar from "./components/SideBar.vue";
 
 	export default {
 		name: "app",
-		components: {},
+		components: {
+			SideBar,
+		},
 
 		data: () => ({
+			showSideBar: true, //todo fixme
+			counters: [],
 		}),
 
 		created: async function () {
 			if (this.$route.fullPath === "/")
 				await this.$router.push("/counter/1");
+
+			await this.loadSideBar();
 		},
+
+		methods: {
+			auth: async function () {
+				this.$router.push('/counter/1');
+				this.loadSideBar();
+			},
+
+			loadSideBar: async function () {
+				let counters_resp = await fetch("/api/counters", {
+					method: "GET",
+					credentials: "include",
+					headers: {
+						"Content-Type": "application/json"
+					},
+				});
+				this.counters = await counters_resp.json();
+			},
+		}
 	};
 </script>
 
@@ -39,5 +65,6 @@
 	body {
 		margin: 0;
 		background-color: #002B36;
+		font-family: "Lato", sans-serif;
 	}
 </style>

@@ -54,12 +54,15 @@
 
 				if (rows.status === 403) {
 					await this.$router.push("/auth");
+					return;
 				}
 
-				this.entries = (await rows.json()).map(v => {
-					v.created = new Date(v.created + "Z").toLocaleString();
-					return v;
-				});
+				if (rows.status === 200) {
+					this.entries = (await rows.json()).map(v => {
+						v.created = new Date(v.created + "Z").toLocaleString();
+						return v;
+					});
+				}
 			},
 
 			addOne: async function () {
