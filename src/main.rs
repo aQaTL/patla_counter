@@ -2,14 +2,13 @@ use actix_files::NamedFile;
 use actix_identity::Identity;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::error::BlockingError;
+use actix_web::web::*;
 use actix_web::*;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
-use diesel::Insertable;
 use models::{Counter, Entry};
 use rand::Rng;
 use sha2::{Digest, Sha256};
-use std::io::{Read, Write};
 use structopt::StructOpt;
 
 #[macro_use]
@@ -123,7 +122,20 @@ async fn edit(
 	pool: web::Data<Pool>,
 	id: Identity,
 ) -> Result<impl Responder, Error> {
-	Ok("")
+	if let None = id.identity() {
+		return Ok(HttpResponse::Forbidden().body("Access denied"));
+	}
+
+	web::block(move || {
+		use self::schema::entries::dsl::*;
+		diesel::update(entries.filter(id.eq(form.id)))
+			.set(reason.eq(&form.reason))
+			.execute(&pool.get().unwrap())
+	})
+	.await
+	.map_err(|_| HttpResponse::InternalServerError())?;
+
+	Ok(HttpResponse::Ok().body(""))
 }
 
 async fn delete(
@@ -131,7 +143,18 @@ async fn delete(
 	pool: web::Data<Pool>,
 	id: Identity,
 ) -> Result<impl Responder, Error> {
-	Ok("")
+	if let None = id.identity() {
+		return Ok(HttpResponse::Forbidden().body("Access denied"));
+	}
+
+	web::block(move || {
+		use self::schema::entries::dsl::*;
+		diesel::delete(entries.filter(id.eq(form.id))).execute(&pool.get().unwrap())
+	})
+	.await
+	.map_err(|_| HttpResponse::InternalServerError())?;
+
+	Ok(HttpResponse::Ok().body(""))
 }
 
 async fn auth(
@@ -158,6 +181,71 @@ async fn auth(
 	id.remember("user".into());
 
 	Ok(HttpResponse::Ok().body("Ok"))
+}
+
+async fn add_counter(
+	form: Json<forms::AddCounter>,
+	pool: Data<Pool>,
+	id: Identity,
+) -> Result<impl Responder, Error> {
+	if let None = id.identity() {
+		return Ok(HttpResponse::Forbidden().body("Access denied"));
+	}
+
+	let new_counter = web::block(move || {
+		let new_counter = models::InsertCounter {
+			name: form.name.clone(),
+		};
+
+		use self::schema::counters::dsl::*;
+		diesel::insert_into(counters)
+			.values(&new_counter)
+			.get_result::<models::Counter>(&pool.get().unwrap())
+	})
+	.await
+	.map_err(|_| HttpResponse::InternalServerError())?;
+
+	Ok(HttpResponse::Ok().json(new_counter))
+}
+
+async fn edit_counter(
+	form: Json<forms::EditCounter>,
+	pool: Data<Pool>,
+	id: Identity,
+) -> Result<impl Responder, Error> {
+	if let None = id.identity() {
+		return Ok(HttpResponse::Forbidden().body("Access denied"));
+	}
+
+	web::block(move || {
+		use self::schema::counters::dsl::*;
+		diesel::update(counters.filter(id.eq(form.id)))
+			.set(name.eq(&form.name))
+			.execute(&pool.get().unwrap())
+	})
+	.await
+	.map_err(|_| HttpResponse::InternalServerError())?;
+
+	Ok(HttpResponse::Ok().body(""))
+}
+
+async fn delete_counter(
+	form: Json<forms::DeleteCounter>,
+	pool: Data<Pool>,
+	id: Identity,
+) -> Result<impl Responder, Error> {
+	if let None = id.identity() {
+		return Ok(HttpResponse::Forbidden().body("Access denied"));
+	}
+
+	web::block(move || {
+		use self::schema::counters::dsl::*;
+		diesel::delete(counters.filter(id.eq(form.id))).execute(&pool.get().unwrap())
+	})
+	.await
+	.map_err(|_| HttpResponse::InternalServerError())?;
+
+	Ok(HttpResponse::Ok().body(""))
 }
 
 async fn index() -> Result<impl Responder, Error> {
@@ -219,7 +307,12 @@ async fn main() -> std::io::Result<()> {
 					.route("/counter/{id}", web::get().to(get_counter))
 					.route("/counters", web::get().to(get_counters))
 					.route("/add", web::post().to(add))
-					.route("/auth", web::post().to(auth)),
+					.route("/edit", web::post().to(edit))
+					.route("/delete", web::delete().to(delete))
+					.route("/auth", web::post().to(auth))
+					.route("/add_counter", web::post().to(add_counter))
+					.route("/edit_counter", web::post().to(edit_counter))
+					.route("/delete_counter", web::post().to(delete_counter)),
 			)
 			.service(actix_files::Files::new("/", "frontend/dist").index_file("index.html"))
 			.default_service(

@@ -20,6 +20,12 @@ pub struct Counter {
 }
 
 #[derive(Insertable)]
+#[table_name = "counters"]
+pub struct InsertCounter {
+	pub name: Option<String>,
+}
+
+#[derive(Insertable)]
 #[table_name = "entries"]
 pub struct InsertEntry {
 	pub reason: Option<String>,

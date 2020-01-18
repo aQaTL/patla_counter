@@ -1,4 +1,4 @@
-use crate::{db, models, Pool};
+use crate::{db, models};
 use actix_web::web;
 use diesel::RunQueryDsl;
 use sha2::{Digest, Sha256};
