@@ -183,13 +183,23 @@ async fn main() -> std::io::Result<()> {
 
 	let pool = db::connect().await;
 
-	let bind_addr = format!(
-		"{}:{}",
-		std::env::var("ADDRESS").unwrap_or(String::from("0.0.0.0")),
-		std::env::var("PORT").unwrap()
-	);
-	println!("BIND ADDRESS: {}", bind_addr);
-	HttpServer::new(move || {
+	let mut addresses = std::env::vars()
+		.filter(|(key, _)| key.starts_with("ADDRESS"))
+		.map(|(_, val)| val)
+		.collect::<Vec<String>>();
+	if addresses.is_empty() {
+		addresses.push("0.0.0.0".into());
+	}
+
+	let port = std::env::var("PORT").unwrap();
+
+	let bind_addresses = addresses
+		.into_iter()
+		.map(|addr| format!("{}:{}", addr, port))
+		.collect::<Vec<String>>();
+
+	println!("BIND ADDRESSS: {:?}", bind_addresses);
+	let mut server = HttpServer::new(move || {
 		App::new()
 			.data(pool.clone())
 			// .wrap(
@@ -223,11 +233,15 @@ async fn main() -> std::io::Result<()> {
 							.to(HttpResponse::MethodNotAllowed),
 					),
 			)
-	})
-	.bind(bind_addr.clone())
-	.expect(&format!("failed to bind to {}", bind_addr))
-	.run()
-	.await
+	});
+
+	for addr in bind_addresses {
+		server = server
+			.bind(&addr)
+			.expect(&format!("failed to bind to {}", addr));
+	}
+
+	server.run().await
 }
 
 pub fn now() -> chrono::NaiveDateTime {
