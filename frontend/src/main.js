@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import App from './App.vue'
 import VueRouter from "vue-router";
+import Vue2TouchEvents from 'vue2-touch-events'
 
 import Counter from "./components/Counter.vue";
 import Auth from "./components/Auth";
@@ -8,6 +9,7 @@ import Auth from "./components/Auth";
 Vue.config.productionTip = false
 
 Vue.use(VueRouter)
+Vue.use(Vue2TouchEvents)
 
 const router = new VueRouter({
 	mode: 'history',

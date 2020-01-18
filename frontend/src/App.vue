@@ -1,6 +1,6 @@
 <template>
 	<div id="app">
-		<side-bar v-if="showSideBar" v-bind:counters="counters" />
+		<side-bar v-bind:counters="counters" />
 		<router-view v-on:authenticated="auth()" v-on:loadSideBar="loadSideBar()">
 		</router-view>
 	</div>
@@ -16,7 +16,6 @@
 		},
 
 		data: () => ({
-			showSideBar: true, //todo fixme
 			counters: [],
 		}),
 
