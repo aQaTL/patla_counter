@@ -20,9 +20,18 @@
 				</g>
 			</svg>
 		</a>
-		<div v-if="show">
+		<div v-if="show" id="side-bar-main">
 			<hr>
-			<span v-for="counter in counters" v-bind:key="counter.id">{{ counter.name }}</span>
+			<div
+					v-for="counter in counters"
+					v-bind:key="counter.id"
+					class="counter"
+					v-bind:class="{ 'counter-current': $route.params.id == counter.id }"
+			>
+				<router-link :to="'/counter/' + counter.id">
+					{{ counter.name }}
+				</router-link>
+			</div>
 			<button type="button" class="add-button" value="">Dodaj licznik</button>
 		</div>
 		<div v-else></div>
@@ -115,5 +124,32 @@
 
 	#show-button:hover rect {
 		fill: #00AFAF;
+	}
+
+	.add-button {
+		margin-top: 20px;
+		background-color: #002B36;
+		padding: 10px;
+	}
+
+	#side-bar-main {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	#side-bar-main > hr {
+		align-self: stretch;
+		margin-left: 0;
+		margin-right: 0;
+		margin-bottom: 10px;
+	}
+
+	.counter {
+
+	}
+
+	.counter-current > a {
+		color: #D33682;
 	}
 </style>

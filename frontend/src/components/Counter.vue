@@ -58,6 +58,7 @@
 				}
 
 				if (rows.status === 200) {
+					this.$emit("loadSideBar");
 					this.entries = (await rows.json()).map(v => {
 						v.created = new Date(v.created + "Z").toLocaleString();
 						return v;
@@ -110,10 +111,6 @@
 	}
 
 	.add-form > input[type="submit"] {
-		border: none;
-		border-radius: 4px;
-		background-color: #073642;
-		color: #B58900;
 		font-size: 14pt;
 	}
 

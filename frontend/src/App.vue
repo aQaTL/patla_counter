@@ -1,7 +1,7 @@
 <template>
 	<div id="app">
-		<side-bar v-if="showSideBar" v-bind:counters="counters"/>
-		<router-view v-on:authenticated="auth()">
+		<side-bar v-if="showSideBar" v-bind:counters="counters" />
+		<router-view v-on:authenticated="auth()" v-on:loadSideBar="loadSideBar()">
 		</router-view>
 	</div>
 </template>
@@ -23,8 +23,6 @@
 		created: async function () {
 			if (this.$route.fullPath === "/")
 				await this.$router.push("/counter/1");
-
-			await this.loadSideBar();
 		},
 
 		methods: {
@@ -66,5 +64,13 @@
 		margin: 0;
 		background-color: #002B36;
 		font-family: "Lato", sans-serif;
+
+	}
+
+	input[type="submit"], button {
+		border: none;
+		border-radius: 4px;
+		background-color: #073642;
+		color: #B58900;
 	}
 </style>
