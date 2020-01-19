@@ -72,4 +72,8 @@
 		background-color: #073642;
 		color: #B58900;
 	}
+
+	input[type="submit"]:hover, button:hover, input[type="button"]:hover {
+		background-color: #0b5164;
+	}
 </style>

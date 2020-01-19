@@ -161,6 +161,10 @@
 		padding: 1em;
 	}
 
+	.add-button:hover {
+		background-color: #0b5164;
+	}
+
 	.add-form {
 		margin-top: 20px;
 	}
@@ -186,6 +190,7 @@
 		margin-left: 0;
 		margin-right: 0;
 		margin-bottom: 10px;
+		border: 1px #839496 solid;
 	}
 
 	.counter {
