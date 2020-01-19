@@ -78,7 +78,6 @@ async fn get_counters(
 	let counters = web::block(move || {
 		use self::schema::counters::dsl::*;
 		counters
-			.order(id.desc())
 			.load::<Counter>(&pool.get().unwrap())
 	})
 	.await
@@ -205,7 +204,7 @@ async fn add_counter(
 	.await
 	.map_err(|_| HttpResponse::InternalServerError())?;
 
-	Ok(HttpResponse::Ok().json(new_counter))
+	Ok(HttpResponse::Created().json(new_counter))
 }
 
 async fn edit_counter(

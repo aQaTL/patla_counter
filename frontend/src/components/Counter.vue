@@ -61,6 +61,13 @@
 			this.loadEntries();
 		},
 
+		watch: {
+			$route(to) {
+				this.id = to.params.id;
+				this.loadEntries();
+			}
+		},
+
 		methods: {
 			loadEntries: async function () {
 				let rows = await fetch("/api/counter/" + this.id, {

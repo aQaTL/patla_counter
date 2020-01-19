@@ -32,7 +32,13 @@
 					{{ counter.name }}
 				</router-link>
 			</div>
-			<button type="button" class="add-button" value="">Dodaj licznik</button>
+			<button v-if="!addMode" type="button" class="add-button add-form" @click="addMode = true">
+				Dodaj licznik
+			</button>
+			<div v-else class="add-form">
+				<input type="text" placeholder="Nazwa" v-model="newName">
+				<button type="button" @click="addCounter" class="add-button">Ok</button>
+			</div>
 		</div>
 		<div v-else></div>
 	</div>
@@ -44,6 +50,8 @@
 
 		data: () => ({
 			show: false,
+			addMode: false,
+			newName: "",
 		}),
 
 		props: {
@@ -53,6 +61,28 @@
 		methods: {
 			toggleSideBar: async function () {
 				this.show = !this.show;
+				this.addMode = false;
+			},
+
+			addCounter: async function () {
+				let resp = await fetch("/api/add_counter", {
+					method: "POST",
+					credentials: "include",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+							name: this.newName,
+					})
+				});
+
+				if (resp.status === 201) {
+					let new_entry = await resp.json();
+					this.counters.push(new_entry);
+
+					this.newName = "";
+					this.addMode = false;
+				}
 			},
 		},
 	}
@@ -127,15 +157,28 @@
 	}
 
 	.add-button {
-		margin-top: 20px;
 		background-color: #002B36;
-		padding: 10px;
+		padding: 1em;
+	}
+
+	.add-form {
+		margin-top: 20px;
+	}
+
+	input[type="text"] {
+		border: none;
+		border-radius: 4px;
+		background-color: #002B36;
+		color: #EEE8D5;
+		padding: 1em;
+		margin-right: 1em;
 	}
 
 	#side-bar-main {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		overflow: auto;
 	}
 
 	#side-bar-main > hr {
@@ -146,10 +189,26 @@
 	}
 
 	.counter {
+		margin-top: 5px;
+	}
 
+	a {
+		text-decoration: none;
+	}
+
+	.counter > a {
+		color: #657B83;
+	}
+
+	.counter > a:hover {
+		color: #B58900;
 	}
 
 	.counter-current > a {
+		color: #D33682;
+	}
+
+	.counter-current > a:visited {
 		color: #D33682;
 	}
 </style>
